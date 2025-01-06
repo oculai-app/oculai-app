@@ -40,7 +40,7 @@ CATEGORY_FOLDERS = {
     "Diabetic Retinopathy": "dr",
     "Glaucoma": "glc"
 }
-PRE_TRAIN_SAMPLES = 5  # Number of samples per category for pre-training
+PRE_TRAIN_SAMPLES = 25  # Number of samples per category for pre-training
 
 # Preprocess image with caching
 @st.cache_data(show_spinner=False)
@@ -91,7 +91,7 @@ def load_model():
             model.train()
             optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
             criterion = torch.nn.CrossEntropyLoss()
-            for _ in range(5):  # 5 quick iterations for fine-tuning
+            for _ in range(10):  # 10 iterations for fine-tuning
                 random.shuffle(pre_train_data)
                 for inputs, labels in pre_train_data:
                     optimizer.zero_grad()
