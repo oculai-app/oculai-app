@@ -36,7 +36,8 @@ def load_model():
     try:
         response = requests.get(MODEL_URL)
         response.raise_for_status()
-        model = models.efficientnet_b0(pretrained=True)
+        # Load EfficientNet-B4 instead of B0
+        model = models.efficientnet_b4(pretrained=True)
         num_features = model.classifier[1].in_features
         model.classifier[1] = torch.nn.Linear(num_features, len(CATEGORIES))
         state_dict = torch.load(io.BytesIO(response.content), map_location=torch.device("cpu"))
