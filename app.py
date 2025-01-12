@@ -1,7 +1,7 @@
 import streamlit as st
+from PIL import Image
 import torch
 from torchvision import transforms, models
-from PIL import Image
 import requests
 import io
 import numpy as np
@@ -65,66 +65,53 @@ def predict(image_tensor, model):
     probabilities = torch.nn.functional.softmax(outputs, dim=1).squeeze().tolist()
     return probabilities
 
-# Sidebar for Input Method Selection and Image Upload/Capture
+# Initialize session state for managing uploads and toggle
+if 'focused_diagnosis' not in st.session_state:
+    st.session_state.focused_diagnosis = False
+if 'images' not in st.session_state:
+    st.session_state.images = []
+if 'uploader_key' not in st.session_state:
+    st.session_state.uploader_key = 0
+
+# Sidebar for input and controls
 with st.sidebar:
     st.header("Input Image")
-    
-    # Persistent state for Focused Diagnosis toggle and uploaded images
-    if 'focused_diagnosis' not in st.session_state:
-        st.session_state.focused_diagnosis = False
-    if 'images' not in st.session_state:
-        st.session_state.images = []
-    
-    # Dynamic key for file uploader (to reset it)
-    if 'uploader_key' not in st.session_state:
-        st.session_state.uploader_key = 0
 
-    # Toggle for Focused Diagnosis Mode
+    # Focused Diagnosis toggle
     focused_diagnosis = st.checkbox(
-        "Focused Diagnosis", 
+        "Focused Diagnosis",
         value=st.session_state.focused_diagnosis,
         key="focused_diagnosis_toggle"
     )
 
-    # Clear Uploads Button - Resets file uploader and clears session images
-    if st.button("Clear Uploads"):
+    # Clear Data button to reset file uploader and session state
+    if st.button("Clear Data"):
         st.session_state.images.clear()
-        st.session_state.uploader_key += 1  # Increment key to reset file_uploader
+        st.session_state.uploader_key += 1  # Increment key to reset file uploader
+        st.session_state.focused_diagnosis = False  # Ensure Focused Diagnosis is disabled
 
-    input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
+    # File uploader with dynamic key for resetting
+    uploaded_files = st.file_uploader(
+        "Upload Eye Image(s)",
+        type=["jpg", "png", "jpeg"],
+        accept_multiple_files=True,
+        key=f"file_uploader_{st.session_state.uploader_key}"
+    )
 
-    # Handle image uploads or camera input
-    if input_method == "Upload Image":
-        uploaded_files = st.file_uploader(
-            "Upload Eye Image(s)", 
-            type=["jpg", "png", "jpeg"], 
-            accept_multiple_files=True,
-            key=f"file_uploader_{st.session_state.uploader_key}"  # Dynamic key to reset uploader
-        )
-        
-        if uploaded_files:
-            for uploaded_file in uploaded_files:
-                try:
-                    img = Image.open(uploaded_file).convert("RGB")
-                    st.session_state.images.append((uploaded_file.name, img))
-                except Exception as e:
-                    st.error(f"Invalid image file: {e}")
-            
-            # Force Focused Diagnosis if multiple files are uploaded and toggle is off
-            if len(st.session_state.images) > 1 and not focused_diagnosis:
-                st.session_state.focused_diagnosis = True  # Auto-check Focused Diagnosis box
-                st.warning("Multiple images detected. Switching to Focused Diagnosis mode.")
-    
-    elif input_method == "Capture from Camera":
-        camera_image = st.camera_input("Capture Eye Image")
-        if camera_image:
+    # Process uploaded files
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
             try:
-                img = Image.open(camera_image).convert("RGB")
-                st.session_state.images.append(("Captured Image", img))
+                img = Image.open(uploaded_file).convert("RGB")
+                st.session_state.images.append((uploaded_file.name, img))
             except Exception as e:
-                st.error(f"Invalid camera input: {e}")
+                st.error(f"Invalid image file: {e}")
 
-# Main Content Area for Analysis and Diagnosis
+        # Automatically enable Focused Diagnosis if multiple files are uploaded
+        if len(st.session_state.images) > 1:
+            st.session_state.focused_diagnosis = True
+
+# Main content area
 st.title("👁️ OculAI")
 st.subheader("One Model, Countless Diseases")
 st.markdown("Upload or capture an eye image from the sidebar to analyze potential eye conditions.")
@@ -136,7 +123,7 @@ with st.spinner("Loading AI Model..."):
 st.success("Model loaded successfully!")
 
 if st.session_state.images:
-    if focused_diagnosis or len(st.session_state.images) > 1:  # Focused Diagnosis Mode or Multiple Images Uploaded
+    if st.session_state.focused_diagnosis:  # Focused Diagnosis mode
         for image_name, img in st.session_state.images:
             with st.spinner(f"Analyzing {image_name}..."):
                 try:
@@ -156,7 +143,7 @@ if st.session_state.images:
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
     else:  # Single Image Mode (Default)
-        image_name, img = st.session_state.images[-1]  # Only process the latest uploaded image
+        image_name, img = st.session_state.images[-1]  # Show only the latest uploaded image
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
 
         # Analysis and Prediction Section
@@ -178,7 +165,6 @@ if st.session_state.images:
                 # Display category probabilities with progress bars
                 st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
                 for category, prob in zip(CATEGORIES, probabilities):
-                    st.markdown(f"<strong>{category}:</strong> {prob * 100:.2f}%", unsafe_allow_html=True)
                     progress_html = f"""
                     <div style="background-color: #e0e0e0; border-radius: 25px; width: 100%; height: 18px; margin-bottom: 10px;">
                         <div style="background-color: {COLORS[category]}; width: {prob * 100}%; height: 100%; border-radius: 25px;"></div>
@@ -196,4 +182,4 @@ if st.session_state.images:
             except Exception as e:
                 st.error(f"Error during prediction for {image_name}: {e}")
 else:
-    st.info("Please upload or capture an eye image from the sidebar to proceed.")
+    st.info("Please upload an eye image to proceed.")
