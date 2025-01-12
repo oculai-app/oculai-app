@@ -74,6 +74,10 @@ with st.sidebar:
         st.session_state.focused_diagnosis = False
     if 'images' not in st.session_state:
         st.session_state.images = []
+    
+    # Dynamic key for file uploader (to reset it)
+    if 'uploader_key' not in st.session_state:
+        st.session_state.uploader_key = 0
 
     # Toggle for Focused Diagnosis Mode
     focused_diagnosis = st.checkbox(
@@ -82,16 +86,21 @@ with st.sidebar:
         key="focused_diagnosis_toggle"
     )
 
-    input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
-
-    # Clear Uploads Button
+    # Clear Uploads Button - Resets file uploader and clears session images
     if st.button("Clear Uploads"):
         st.session_state.images.clear()
-        st.info("All uploaded images have been cleared.")
+        st.session_state.uploader_key += 1  # Increment key to reset file_uploader
+
+    input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
     # Handle image uploads or camera input
     if input_method == "Upload Image":
-        uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "Upload Eye Image(s)", 
+            type=["jpg", "png", "jpeg"], 
+            accept_multiple_files=True,
+            key=f"file_uploader_{st.session_state.uploader_key}"  # Dynamic key to reset uploader
+        )
         
         if uploaded_files:
             for uploaded_file in uploaded_files:
