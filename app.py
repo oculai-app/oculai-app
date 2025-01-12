@@ -140,8 +140,21 @@ if st.session_state.images:
                         f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
                         unsafe_allow_html=True,
                     )
+
+                    # Display category probabilities for each image in Focused Diagnosis mode
+                    st.markdown("<h4>Category Probabilities:</h4>", unsafe_allow_html=True)
+                    for category, prob in zip(CATEGORIES, probabilities):
+                        progress_bar_text = f"{category}: {prob * 100:.2f}%"
+                        progress_color = COLORS[category]
+                        progress_value = prob * 100
+
+                        # Render progress bar and text below it
+                        st.progress(prob)  # Streamlit's built-in progress bar widget
+                        st.markdown(f"<p style='color:{progress_color}'>{progress_bar_text}</p>", unsafe_allow_html=True)
+
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
+                    
     else:  # Single Image Mode (Default)
         image_name, img = st.session_state.images[-1]  # Show only the latest uploaded image
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
@@ -165,12 +178,13 @@ if st.session_state.images:
                 # Display category probabilities with progress bars
                 st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
                 for category, prob in zip(CATEGORIES, probabilities):
-                    progress_html = f"""
-                    <div style="background-color: #e0e0e0; border-radius: 25px; width: 100%; height: 18px; margin-bottom: 10px;">
-                        <div style="background-color: {COLORS[category]}; width: {prob * 100}%; height: 100%; border-radius: 25px;"></div>
-                    </div>
-                    """
-                    st.markdown(progress_html, unsafe_allow_html=True)
+                    progress_bar_text = f"{category}: {prob * 100:.2f}%"
+                    progress_color = COLORS[category]
+                    progress_value = prob * 100
+
+                    # Render progress bar and text below it
+                    st.progress(prob)  # Streamlit's built-in progress bar widget
+                    st.markdown(f"<p style='color:{progress_color}'>{progress_bar_text}</p>", unsafe_allow_html=True)
 
                 # Additional insights or warnings based on prediction
                 if prediction != "Normal":
