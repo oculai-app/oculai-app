@@ -87,7 +87,7 @@ with st.sidebar:
             "Upload Eye Image(s)",
             type=["jpg", "png", "jpeg"],
             accept_multiple_files=True,
-            key=f"uploader_{st.session_state.uploader_key}"  # Dynamic key for resetting uploader
+            key=f"uploader_{st.session_state.uploader_key}"
         )
         if uploaded_files:
             for uploaded_file in uploaded_files:
@@ -162,6 +162,8 @@ if images:
     # Multiple image uploads
     else:
         for image_name, img in images:
+            col1, col2, col3 = st.columns([8, 1, 1])
+            
             # Show spinner while analyzing each image sequentially
             with st.spinner(f"Analyzing {image_name}..."):
                 try:
@@ -173,11 +175,29 @@ if images:
                     prediction = CATEGORIES[prediction_idx]
                     confidence_score = probabilities[prediction_idx] * 100
 
-                    # Display results for this image (minimal display for multiple images)
-                    st.markdown(
-                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
-                        unsafe_allow_html=True,
-                    )
+                    # Create unique keys for each image's state
+                    view_key = f"view_{image_name}"
+                    if view_key not in st.session_state:
+                        st.session_state[view_key] = False
+
+                    # Display results in columns
+                    with col1:
+                        st.markdown(
+                            f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                            unsafe_allow_html=True,
+                        )
+                    with col2:
+                        if st.button("View", key=f"view_btn_{image_name}"):
+                            st.session_state[view_key] = True
+                    with col3:
+                        if st.button("✕", key=f"close_btn_{image_name}"):
+                            st.session_state[view_key] = False
+
+                    # Display image in sidebar if view state is True
+                    if st.session_state[view_key]:
+                        with st.sidebar:
+                            st.image(img, caption=image_name, use_column_width=True)
+
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
 
