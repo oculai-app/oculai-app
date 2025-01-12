@@ -69,12 +69,27 @@ def predict(image_tensor, model):
 with st.sidebar:
     st.header("Input Image")
     
+    # Persistent state for Focused Diagnosis toggle and uploaded images
+    if 'focused_diagnosis' not in st.session_state:
+        st.session_state.focused_diagnosis = False
+    if 'images' not in st.session_state:
+        st.session_state.images = []
+
     # Toggle for Focused Diagnosis Mode
-    focused_diagnosis = st.checkbox("Focused Diagnosis", value=False)
+    focused_diagnosis = st.checkbox(
+        "Focused Diagnosis", 
+        value=st.session_state.focused_diagnosis,
+        key="focused_diagnosis_toggle"
+    )
 
     input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
-    images = []
+    # Clear Uploads Button
+    if st.button("Clear Uploads"):
+        st.session_state.images.clear()
+        st.info("All uploaded images have been cleared.")
+
+    # Handle image uploads or camera input
     if input_method == "Upload Image":
         uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
         
@@ -82,21 +97,21 @@ with st.sidebar:
             for uploaded_file in uploaded_files:
                 try:
                     img = Image.open(uploaded_file).convert("RGB")
-                    images.append((uploaded_file.name, img))
+                    st.session_state.images.append((uploaded_file.name, img))
                 except Exception as e:
                     st.error(f"Invalid image file: {e}")
-                    
+            
             # Force Focused Diagnosis if multiple files are uploaded and toggle is off
-            if not focused_diagnosis and len(images) > 1:
+            if len(st.session_state.images) > 1 and not focused_diagnosis:
+                st.session_state.focused_diagnosis = True  # Auto-check Focused Diagnosis box
                 st.warning("Multiple images detected. Switching to Focused Diagnosis mode.")
-                focused_diagnosis = True
-
+    
     elif input_method == "Capture from Camera":
         camera_image = st.camera_input("Capture Eye Image")
         if camera_image:
             try:
                 img = Image.open(camera_image).convert("RGB")
-                images.append(("Captured Image", img))
+                st.session_state.images.append(("Captured Image", img))
             except Exception as e:
                 st.error(f"Invalid camera input: {e}")
 
@@ -111,9 +126,9 @@ with st.spinner("Loading AI Model..."):
 
 st.success("Model loaded successfully!")
 
-if images:
-    if focused_diagnosis or len(images) > 1:  # Focused Diagnosis Mode or Multiple Images Uploaded
-        for image_name, img in images:
+if st.session_state.images:
+    if focused_diagnosis or len(st.session_state.images) > 1:  # Focused Diagnosis Mode or Multiple Images Uploaded
+        for image_name, img in st.session_state.images:
             with st.spinner(f"Analyzing {image_name}..."):
                 try:
                     input_tensor = preprocess_image(img)
@@ -132,7 +147,7 @@ if images:
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
     else:  # Single Image Mode (Default)
-        image_name, img = images[0]
+        image_name, img = st.session_state.images[-1]  # Only process the latest uploaded image
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
 
         # Analysis and Prediction Section
