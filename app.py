@@ -70,19 +70,22 @@ with st.sidebar:
     st.header("Input Image")
     input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
-    img = None
+    images = []
     if input_method == "Upload Image":
-        uploaded_file = st.file_uploader("Upload Eye Image", type=["jpg", "png", "jpeg"])
-        if uploaded_file:
-            try:
-                img = Image.open(uploaded_file).convert("RGB")
-            except Exception as e:
-                st.error(f"Invalid image file: {e}")
+        uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        if uploaded_files:
+            for uploaded_file in uploaded_files:
+                try:
+                    img = Image.open(uploaded_file).convert("RGB")
+                    images.append((uploaded_file.name, img))
+                except Exception as e:
+                    st.error(f"Invalid image file: {e}")
     elif input_method == "Capture from Camera":
         camera_image = st.camera_input("Capture Eye Image")
         if camera_image:
             try:
                 img = Image.open(camera_image).convert("RGB")
+                images.append(("Captured Image", img))
             except Exception as e:
                 st.error(f"Invalid camera input: {e}")
 
@@ -97,46 +100,73 @@ with st.spinner("Loading AI Model..."):
 
 st.success("Model loaded successfully!")
 
-if img:
-    # Display Selected Image in Main Content Area
-    st.image(img, caption="Selected Image", use_column_width=True)
+if images:
+    # Single image upload
+    if len(images) == 1:
+        image_name, img = images[0]
+        st.image(img, caption="Selected Image", use_column_width=True)
 
-    # Analysis and Prediction Section
-    with st.spinner("Analyzing..."):
-        try:
-            input_tensor = preprocess_image(img)
-            probabilities = predict(input_tensor, model)
+        # Analysis and Prediction Section
+        with st.spinner("Analyzing..."):
+            try:
+                input_tensor = preprocess_image(img)
+                probabilities = predict(input_tensor, model)
 
-            # Display Predicted Category and Description
-            prediction_idx = np.argmax(probabilities)
-            prediction = CATEGORIES[prediction_idx]
-            confidence_score = probabilities[prediction_idx] * 100
+                # Display Predicted Category and Description
+                prediction_idx = np.argmax(probabilities)
+                prediction = CATEGORIES[prediction_idx]
+                confidence_score = probabilities[prediction_idx] * 100
 
-            st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
-            st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
-            st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
+                st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
+                st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
 
-            # Display Probabilities with Progress Bars and Colors
-            st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
-            for category, prob in zip(CATEGORIES, probabilities):
-                st.markdown(f"<strong>{category}:</strong> {prob * 100:.2f}%", unsafe_allow_html=True)
-                progress_html = f"""
-                <div style="background-color: #e0e0e0; border-radius: 25px; width: 100%; height: 18px; margin-bottom: 10px;">
-                    <div style="background-color: {COLORS[category]}; width: {prob * 100}%; height: 100%; border-radius: 25px;"></div>
-                </div>
-                """
-                st.markdown(progress_html, unsafe_allow_html=True)
+                # Display Probabilities with Progress Bars and Colors
+                st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
+                for category, prob in zip(CATEGORIES, probabilities):
+                    st.markdown(f"<strong>{category}:</strong> {prob * 100:.2f}%", unsafe_allow_html=True)
+                    progress_html = f"""
+                    <div style="background-color: #e0e0e0; border-radius: 25px; width: 100%; height: 18px; margin-bottom: 10px;">
+                        <div style="background-color: {COLORS[category]}; width: {prob * 100}%; height: 100%; border-radius: 25px;"></div>
+                    </div>
+                    """
+                    st.markdown(progress_html, unsafe_allow_html=True)
 
-            # Additional Analysis Features (Optional)
-            st.markdown("<h3>Additional Insights:</h3>", unsafe_allow_html=True)
-            if prediction != "Normal":
-                st.warning(
-                    f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                # Additional Analysis Features (Optional)
+                if prediction != "Normal":
+                    st.warning(
+                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                    )
+                else:
+                    st.success("The eye appears healthy! No abnormalities detected.")
+            except Exception as e:
+                st.error(f"Error during prediction: {e}")
+    # Multiple image uploads
+    else:
+        with st.spinner("Analyzing multiple images..."):
+            results = []
+            for image_name, img in images:
+                try:
+                    input_tensor = preprocess_image(img)
+                    probabilities = predict(input_tensor, model)
+
+                    prediction_idx = np.argmax(probabilities)
+                    prediction = CATEGORIES[prediction_idx]
+                    confidence_score = probabilities[prediction_idx] * 100
+
+                    results.append((image_name, prediction, confidence_score))
+                except Exception as e:
+                    results.append((image_name, "Error during prediction", None))
+
+        # Display Results for Each Image
+        for image_name, prediction, confidence_score in results:
+            if confidence_score is not None:
+                color = COLORS[prediction]
+                st.markdown(
+                    f"**{image_name}**: <span style='color:{color}'>{prediction}</span> ({confidence_score:.2f}%)",
+                    unsafe_allow_html=True,
                 )
             else:
-                st.success("The eye appears healthy! No abnormalities detected.")
-
-        except Exception as e:
-            st.error(f"Error during prediction: {e}")
+                st.markdown(f"**{image_name}**: Error during prediction.")
 else:
     st.info("Please upload or capture an eye image from the sidebar to proceed.")
