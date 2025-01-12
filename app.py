@@ -68,11 +68,16 @@ def predict(image_tensor, model):
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     st.header("Input Image")
+    
+    # Toggle for Focused Diagnosis Mode
+    focused_diagnosis = st.checkbox("Focused Diagnosis", value=False)
+
     input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
     images = []
     if input_method == "Upload Image":
         uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 try:
@@ -80,6 +85,12 @@ with st.sidebar:
                     images.append((uploaded_file.name, img))
                 except Exception as e:
                     st.error(f"Invalid image file: {e}")
+                    
+            # Force Focused Diagnosis if multiple files are uploaded and toggle is off
+            if not focused_diagnosis and len(images) > 1:
+                st.warning("Multiple images detected. Switching to Focused Diagnosis mode.")
+                focused_diagnosis = True
+
     elif input_method == "Capture from Camera":
         camera_image = st.camera_input("Capture Eye Image")
         if camera_image:
@@ -101,8 +112,26 @@ with st.spinner("Loading AI Model..."):
 st.success("Model loaded successfully!")
 
 if images:
-    # Single image upload
-    if len(images) == 1:
+    if focused_diagnosis or len(images) > 1:  # Focused Diagnosis Mode or Multiple Images Uploaded
+        for image_name, img in images:
+            with st.spinner(f"Analyzing {image_name}..."):
+                try:
+                    input_tensor = preprocess_image(img)
+                    probabilities = predict(input_tensor, model)
+
+                    # Get prediction and confidence score for this image
+                    prediction_idx = np.argmax(probabilities)
+                    prediction = CATEGORIES[prediction_idx]
+                    confidence_score = probabilities[prediction_idx] * 100
+
+                    # Display results for this image (minimal display for multiple images)
+                    st.markdown(
+                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                        unsafe_allow_html=True,
+                    )
+                except Exception as e:
+                    st.error(f"Error during prediction for {image_name}: {e}")
+    else:  # Single Image Mode (Default)
         image_name, img = images[0]
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
 
@@ -142,28 +171,5 @@ if images:
                     st.success("The eye appears healthy! No abnormalities detected.")
             except Exception as e:
                 st.error(f"Error during prediction for {image_name}: {e}")
-
-    # Multiple image uploads
-    else:
-        for image_name, img in images:
-            # Show spinner while analyzing each image sequentially
-            with st.spinner(f"Analyzing {image_name}..."):
-                try:
-                    input_tensor = preprocess_image(img)
-                    probabilities = predict(input_tensor, model)
-
-                    # Get prediction and confidence score for this image
-                    prediction_idx = np.argmax(probabilities)
-                    prediction = CATEGORIES[prediction_idx]
-                    confidence_score = probabilities[prediction_idx] * 100
-
-                    # Display results for this image (minimal display for multiple images)
-                    st.markdown(
-                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
-                        unsafe_allow_html=True,
-                    )
-                except Exception as e:
-                    st.error(f"Error during prediction for {image_name}: {e}")
-
 else:
     st.info("Please upload or capture an eye image from the sidebar to proceed.")
