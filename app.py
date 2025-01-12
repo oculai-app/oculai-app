@@ -101,27 +101,30 @@ with st.spinner("Loading AI Model..."):
 st.success("Model loaded successfully!")
 
 if images:
-    # Single image upload
-    if len(images) == 1:
-        image_name, img = images[0]
-        st.image(img, caption="Selected Image", use_column_width=True)
+    # Process each image one at a time
+    for image_name, img in images:
+        # Display the current image being processed
+        st.image(img, caption=f"Processing: {image_name}", use_column_width=True)
 
-        # Analysis and Prediction Section
-        with st.spinner("Analyzing..."):
+        # Show spinner while analyzing the current image
+        with st.spinner(f"Analyzing {image_name}..."):
             try:
                 input_tensor = preprocess_image(img)
                 probabilities = predict(input_tensor, model)
 
-                # Display Predicted Category and Description
+                # Get prediction and confidence score
                 prediction_idx = np.argmax(probabilities)
                 prediction = CATEGORIES[prediction_idx]
                 confidence_score = probabilities[prediction_idx] * 100
 
-                st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
+                # Display results for the current image
+                st.markdown(
+                    f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                    unsafe_allow_html=True,
+                )
                 st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
-                st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
 
-                # Display Probabilities with Progress Bars and Colors
+                # Display category probabilities with progress bars
                 st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
                 for category, prob in zip(CATEGORIES, probabilities):
                     st.markdown(f"<strong>{category}:</strong> {prob * 100:.2f}%", unsafe_allow_html=True)
@@ -132,7 +135,7 @@ if images:
                     """
                     st.markdown(progress_html, unsafe_allow_html=True)
 
-                # Additional Analysis Features (Optional)
+                # Additional insights or warnings based on prediction
                 if prediction != "Normal":
                     st.warning(
                         f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
@@ -140,33 +143,7 @@ if images:
                 else:
                     st.success("The eye appears healthy! No abnormalities detected.")
             except Exception as e:
-                st.error(f"Error during prediction: {e}")
-    # Multiple image uploads
-    else:
-        with st.spinner("Analyzing multiple images..."):
-            results = []
-            for image_name, img in images:
-                try:
-                    input_tensor = preprocess_image(img)
-                    probabilities = predict(input_tensor, model)
+                st.error(f"Error during prediction for {image_name}: {e}")
 
-                    prediction_idx = np.argmax(probabilities)
-                    prediction = CATEGORIES[prediction_idx]
-                    confidence_score = probabilities[prediction_idx] * 100
-
-                    results.append((image_name, prediction, confidence_score))
-                except Exception as e:
-                    results.append((image_name, "Error during prediction", None))
-
-        # Display Results for Each Image
-        for image_name, prediction, confidence_score in results:
-            if confidence_score is not None:
-                color = COLORS[prediction]
-                st.markdown(
-                    f"**{image_name}**: <span style='color:{color}'>{prediction}</span> ({confidence_score:.2f}%)",
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(f"**{image_name}**: Error during prediction.")
 else:
     st.info("Please upload or capture an eye image from the sidebar to proceed.")
