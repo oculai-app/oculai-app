@@ -69,13 +69,23 @@ def predict(image_tensor, model):
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 
+# Initialize session state for current view
+if 'current_view' not in st.session_state:
+    st.session_state.current_view = None
+
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     st.header("Input Image")
 
+    # Display current viewed image at the top of the sidebar
+    if st.session_state.current_view:
+        st.image(st.session_state.current_view[1], caption=st.session_state.current_view[0], use_column_width=True)
+        st.markdown("---")
+
     # Clear Data Button
     if st.button("Clear Data"):
         st.session_state.uploader_key += 1  # Increment key to reset file uploader
+        st.session_state.current_view = None
         st.experimental_rerun()  # Reload app to apply changes
 
     # Input Method Selection
@@ -127,8 +137,6 @@ if images:
             try:
                 input_tensor = preprocess_image(img)
                 probabilities = predict(input_tensor, model)
-
-                # Get prediction and confidence score
                 prediction_idx = np.argmax(probabilities)
                 prediction = CATEGORIES[prediction_idx]
                 confidence_score = probabilities[prediction_idx] * 100
@@ -175,11 +183,6 @@ if images:
                     prediction = CATEGORIES[prediction_idx]
                     confidence_score = probabilities[prediction_idx] * 100
 
-                    # Create unique keys for each image's state
-                    view_key = f"view_{image_name}"
-                    if view_key not in st.session_state:
-                        st.session_state[view_key] = False
-
                     # Display results in columns
                     with col1:
                         st.markdown(
@@ -188,15 +191,11 @@ if images:
                         )
                     with col2:
                         if st.button("View", key=f"view_btn_{image_name}"):
-                            st.session_state[view_key] = True
+                            st.session_state.current_view = (image_name, img)
                     with col3:
                         if st.button("✕", key=f"close_btn_{image_name}"):
-                            st.session_state[view_key] = False
-
-                    # Display image in sidebar if view state is True
-                    if st.session_state[view_key]:
-                        with st.sidebar:
-                            st.image(img, caption=image_name, use_column_width=True)
+                            if st.session_state.current_view and st.session_state.current_view[0] == image_name:
+                                st.session_state.current_view = None
 
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
