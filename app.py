@@ -24,10 +24,10 @@ CONDITION_DESCRIPTIONS = {
     "Glaucoma": "A group of eye conditions that damage the optic nerve, often due to high pressure."
 }
 COLORS = {
-    "Normal": "#00ff00",
-    "Cataracts": "#ffff00",
-    "Diabetic Retinopathy": "#ff0000",
-    "Glaucoma": "#0082cb"
+    "Normal": "#00ff00",  # Green
+    "Cataracts": "#ffcc00",  # Yellow-Orange
+    "Diabetic Retinopathy": "#ff3300",  # Red
+    "Glaucoma": "#3399ff"  # Blue
 }
 
 # Preprocess image with caching
@@ -77,13 +77,6 @@ if 'uploader_key' not in st.session_state:
 with st.sidebar:
     st.header("Input Image")
 
-    # Focused Diagnosis toggle
-    focused_diagnosis = st.checkbox(
-        "Focused Diagnosis",
-        value=st.session_state.focused_diagnosis,
-        key="focused_diagnosis_toggle"
-    )
-
     # Clear Data button to reset file uploader and session state
     if st.button("Clear Data"):
         st.session_state.images.clear()
@@ -124,6 +117,8 @@ st.success("Model loaded successfully!")
 
 if st.session_state.images:
     if st.session_state.focused_diagnosis:  # Focused Diagnosis mode
+        st.info("Focused Diagnosis mode activated: Displaying results for all uploaded images.")
+        
         for image_name, img in st.session_state.images:
             with st.spinner(f"Analyzing {image_name}..."):
                 try:
@@ -142,7 +137,6 @@ if st.session_state.images:
                     )
 
                     # Display category probabilities for each image in Focused Diagnosis mode
-                    st.markdown("<h4>Category Probabilities:</h4>", unsafe_allow_html=True)
                     for category, prob in zip(CATEGORIES, probabilities):
                         progress_bar_text = f"{category}: {prob * 100:.2f}%"
                         progress_color = COLORS[category]
@@ -157,9 +151,10 @@ if st.session_state.images:
                     
     else:  # Single Image Mode (Default)
         image_name, img = st.session_state.images[-1]  # Show only the latest uploaded image
+        
+        # Display selected image and bold text results in larger font size.
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
 
-        # Analysis and Prediction Section
         with st.spinner(f"Analyzing {image_name}..."):
             try:
                 input_tensor = preprocess_image(img)
@@ -170,29 +165,29 @@ if st.session_state.images:
                 prediction = CATEGORIES[prediction_idx]
                 confidence_score = probabilities[prediction_idx] * 100
 
-                # Display detailed results for a single image
-                st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
-                st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
-                st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
+                # Display detailed results for a single image with bold and larger text.
+                st.markdown(
+                    f"<h2 style='color: {COLORS[prediction]}'>Predicted Category: <b>{prediction}</b></h2>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<p style='font-size:18px'>{CONDITION_DESCRIPTIONS[prediction]}</p>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<strong>Confidence Score:</strong> <span style='font-size:18px'>{confidence_score:.2f}%</span>",
+                    unsafe_allow_html=True,
+                )
 
-                # Display category probabilities with progress bars
-                st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
+                # Display category probabilities with progress bars.
                 for category, prob in zip(CATEGORIES, probabilities):
                     progress_bar_text = f"{category}: {prob * 100:.2f}%"
                     progress_color = COLORS[category]
-                    progress_value = prob * 100
 
-                    # Render progress bar and text below it
-                    st.progress(prob)  # Streamlit's built-in progress bar widget
+                    # Render progress bar and text below it.
+                    st.progress(prob)  # Streamlit's built-in progress bar widget.
                     st.markdown(f"<p style='color:{progress_color}'>{progress_bar_text}</p>", unsafe_allow_html=True)
 
-                # Additional insights or warnings based on prediction
-                if prediction != "Normal":
-                    st.warning(
-                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
-                    )
-                else:
-                    st.success("The eye appears healthy! No abnormalities detected.")
             except Exception as e:
                 st.error(f"Error during prediction for {image_name}: {e}")
 else:
