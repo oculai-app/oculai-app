@@ -65,6 +65,10 @@ def predict(image_tensor, model):
     probabilities = torch.nn.functional.softmax(outputs, dim=1).squeeze().tolist()
     return probabilities
 
+# Add a "Clear Data" button above the file uploader
+if st.sidebar.button("Clear Data"):
+    st.session_state.clear()
+
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     st.header("Input Image")
@@ -72,7 +76,9 @@ with st.sidebar:
 
     images = []
     if input_method == "Upload Image":
-        uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="file_uploader"
+        )
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 try:
@@ -159,7 +165,7 @@ if images:
 
                     # Display results for this image (minimal display for multiple images)
                     st.markdown(
-                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> (*{confidence_score:.2f}%*)",
                         unsafe_allow_html=True,
                     )
                 except Exception as e:
