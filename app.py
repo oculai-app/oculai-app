@@ -1,7 +1,7 @@
 import streamlit as st
-from PIL import Image
 import torch
 from torchvision import transforms, models
+from PIL import Image
 import requests
 import io
 import numpy as np
@@ -11,184 +11,177 @@ st.set_page_config(
     page_title="OculAI",
     page_icon="👁️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
-# Constants
-MODEL_URL = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/found_eyegvd_94.pth"
-CATEGORIES = ["Normal", "Cataracts", "Diabetic Retinopathy", "Glaucoma"]
-CONDITION_DESCRIPTIONS = {
-    "Normal": "The eye appears healthy with no detected abnormalities.",
-    "Cataracts": "A clouding of the lens in the eye that affects vision.",
-    "Diabetic Retinopathy": "Damage to the retina caused by complications of diabetes.",
-    "Glaucoma": "A group of eye conditions that damage the optic nerve, often due to high pressure."
-}
-COLORS = {
-    "Normal": "#00ff00",  # Green
-    "Cataracts": "#ffcc00",  # Yellow-Orange
-    "Diabetic Retinopathy": "#ff3300",  # Red
-    "Glaucoma": "#3399ff"  # Blue
-}
+# Custom GradCAM implementation
+class GradCAM:
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.target_layer = target_layer
+        self.gradients = None
+        self.activations = None
+        
+        self.target_layer.register_forward_hook(self.save_activation)
+        self.target_layer.register_backward_hook(self.save_gradient)
+    
+    def save_activation(self, module, input, output):
+        self.activations = output.detach()
+    
+    def save_gradient(self, module, grad_input, grad_output):
+        self.gradients = grad_output[0].detach()
+    
+    def __call__(self, x, class_idx=None):
+        self.model.zero_grad()
+        output = self.model(x)
+        
+        if class_idx is None:
+            class_idx = output.argmax(dim=1)
+        
+        one_hot = torch.zeros_like(output)
+        one_hot[0][class_idx] = 1
+        
+        output.backward(gradient=one_hot, retain_graph=True)
+        
+        weights = torch.mean(self.gradients, dim=[2, 3], keepdim=True)
+        cam = torch.sum(weights * self.activations, dim=1, keepdim=True)
+        cam = torch.relu(cam)
+        cam = cam - cam.min()
+        cam = cam / cam.max()
+        
+        return cam.squeeze().cpu().numpy()
 
-# Preprocess image with caching
-@st.cache_data(show_spinner=False)
-def preprocess_image(image):
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    return transform(image).unsqueeze(0)
+def show_cam_on_image(img, mask):
+    heatmap = np.uint8(255 * mask)
+    heatmap = Image.fromarray(heatmap).convert('RGB')
+    heatmap = heatmap.resize((img.shape[1], img.shape[0]))
+    heatmap = np.array(heatmap)
+    
+    superimposed_img = heatmap * 0.4 + img * 255
+    superimposed_img = np.uint8(superimposed_img / np.max(superimposed_img))
+    return superimposed_img
 
 # Load model with caching
-@st.cache_resource(show_spinner=False)
+@st.cache_resource
 def load_model():
     try:
-        response = requests.get(MODEL_URL)
+        url = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/found_eyegvd_92.pth"
+        response = requests.get(url)
         response.raise_for_status()
+
+        # Load pretrained EfficientNet-B0 and modify classifier
         model = models.efficientnet_b0(pretrained=True)
         num_features = model.classifier[1].in_features
-        model.classifier[1] = torch.nn.Linear(num_features, len(CATEGORIES))
+        model.classifier[1] = torch.nn.Linear(num_features, 4)
+
         state_dict = torch.load(io.BytesIO(response.content), map_location=torch.device("cpu"))
         model.load_state_dict(state_dict, strict=True)
+
         model.eval()
         return model
+
     except Exception as e:
         st.error(f"Error loading the model: {e}")
         raise e
 
-# Prediction function
+model = load_model()
+
+# Preprocess image with data augmentation options
+def preprocess_image_with_augmentation(image, apply_augmentation=False):
+    transform_list = [
+        transforms.Resize(256),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
+    
+    if apply_augmentation:
+        transform_list.insert(0, transforms.RandomHorizontalFlip())
+        transform_list.insert(1, transforms.RandomRotation(15))
+    
+    transform = transforms.Compose(transform_list)
+    return transform(image).unsqueeze(0)
+
 @torch.no_grad()
-def predict(image_tensor, model):
+def predict(image_tensor):
     outputs = model(image_tensor)
     probabilities = torch.nn.functional.softmax(outputs, dim=1).squeeze().tolist()
     return probabilities
 
-# Initialize session state for managing uploads and toggle
-if 'focused_diagnosis' not in st.session_state:
-    st.session_state.focused_diagnosis = False
-if 'images' not in st.session_state:
-    st.session_state.images = []
-if 'uploader_key' not in st.session_state:
-    st.session_state.uploader_key = 0
+# Grad-CAM for visualization
+def generate_grad_cam(image_tensor):
+    target_layer = model.features[-1]
+    cam = GradCAM(model=model, target_layer=target_layer)
+    
+    grayscale_cam = cam(image_tensor)
+    rgb_image = image_tensor.squeeze().permute(1, 2, 0).numpy()
+    rgb_image = (rgb_image * [0.229, 0.224, 0.225]) + [0.485, 0.456, 0.406]
+    rgb_image = np.clip(rgb_image, 0, 1)
+    
+    cam_image = show_cam_on_image(rgb_image, grayscale_cam)
+    return cam_image
 
-# Sidebar for input and controls
-with st.sidebar:
-    st.header("Input Image")
-
-    # Clear Data button to reset file uploader and session state
-    if st.button("Clear Data"):
-        st.session_state.images.clear()
-        st.session_state.uploader_key += 1  # Increment key to reset file uploader
-        st.session_state.focused_diagnosis = False  # Ensure Focused Diagnosis is disabled
-
-    # File uploader with dynamic key for resetting
-    uploaded_files = st.file_uploader(
-        "Upload Eye Image(s)",
-        type=["jpg", "png", "jpeg"],
-        accept_multiple_files=True,
-        key=f"file_uploader_{st.session_state.uploader_key}"
-    )
-
-    # Process uploaded files
-    if uploaded_files:
-        for uploaded_file in uploaded_files:
-            try:
-                img = Image.open(uploaded_file).convert("RGB")
-                st.session_state.images.append((uploaded_file.name, img))
-            except Exception as e:
-                st.error(f"Invalid image file: {e}")
-
-        # Automatically enable Focused Diagnosis if multiple files are uploaded
-        if len(st.session_state.images) > 1:
-            st.session_state.focused_diagnosis = True
-
-# Main content area
-st.title("👁️ OculAI")
+st.title("OculAI")
 st.subheader("One Model, Countless Diseases")
-st.markdown("Upload or capture an eye image from the sidebar to analyze potential eye conditions.")
 
-# Model Loading Spinner
-with st.spinner("Loading AI Model..."):
-    model = load_model()
+# Input method selection
+input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
-st.success("Model loaded successfully!")
+img = None
 
-if st.session_state.images:
-    if st.session_state.focused_diagnosis:  # Focused Diagnosis mode
-        st.info("Focused Diagnosis mode activated: Displaying results for all uploaded images.")
+if input_method == "Upload Image":
+    uploaded_file = st.file_uploader("Upload Eye Image", type=["jpg", "png", "jpeg"])
+    if uploaded_file:
+        img = Image.open(uploaded_file).convert("RGB")
+elif input_method == "Capture from Camera":
+    camera_image = st.camera_input("Capture Eye Image")
+    if camera_image:
+        img = Image.open(camera_image).convert("RGB")
+
+if img:
+    with st.spinner("Analyzing..."):
+        st.image(img, caption="Selected Image", use_column_width=True)
+
+        # Option to apply data augmentation
+        apply_augmentation = st.checkbox("Apply Data Augmentation")
         
-        for image_name, img in st.session_state.images:
-            with st.spinner(f"Analyzing {image_name}..."):
-                try:
-                    input_tensor = preprocess_image(img)
-                    probabilities = predict(input_tensor, model)
-
-                    # Get prediction and confidence score for this image
-                    prediction_idx = np.argmax(probabilities)
-                    prediction = CATEGORIES[prediction_idx]
-                    confidence_score = probabilities[prediction_idx] * 100
-
-                    # Display results for this image (minimal display for multiple images)
-                    st.markdown(
-                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
-                        unsafe_allow_html=True,
-                    )
-
-                    # Display category probabilities for each image in Focused Diagnosis mode
-                    for category, prob in zip(CATEGORIES, probabilities):
-                        progress_bar_text = f"{category}: {prob * 100:.2f}%"
-                        progress_color = COLORS[category]
-                        progress_value = prob * 100
-
-                        # Render progress bar and text below it
-                        st.progress(prob)  # Streamlit's built-in progress bar widget
-                        st.markdown(f"<p style='color:{progress_color}'>{progress_bar_text}</p>", unsafe_allow_html=True)
-
-                except Exception as e:
-                    st.error(f"Error during prediction for {image_name}: {e}")
-                    
-    else:  # Single Image Mode (Default)
-        image_name, img = st.session_state.images[-1]  # Show only the latest uploaded image
+        input_tensor = preprocess_image_with_augmentation(img, apply_augmentation=apply_augmentation)
         
-        # Display selected image and bold text results in larger font size.
-        st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
+        try:
+            probabilities = predict(input_tensor)
 
-        with st.spinner(f"Analyzing {image_name}..."):
-            try:
-                input_tensor = preprocess_image(img)
-                probabilities = predict(input_tensor, model)
+            categories = ["Normal", "Cataracts", "Diabetic Retinopathy", "Glaucoma"]
+            prediction_idx = np.argmax(probabilities)
+            prediction = categories[prediction_idx]
 
-                # Get prediction and confidence score
-                prediction_idx = np.argmax(probabilities)
-                prediction = CATEGORIES[prediction_idx]
-                confidence_score = probabilities[prediction_idx] * 100
+            # Display predictions and probabilities
+            st.markdown(f"<h3 style='font-size:28px;'><strong>Predicted Category:</strong> {prediction}</h3>", unsafe_allow_html=True)
+            
+            st.markdown("<h3 style='font-size:24px;'>Probabilities:</h3>", unsafe_allow_html=True)
+            
+            colors = {
+                "Normal": "#00ff00",
+                "Cataracts": "#ffcc00",
+                "Diabetic Retinopathy": "#ff3300",
+                "Glaucoma": "#3399ff"
+            }
+            
+            for category, prob in zip(categories, probabilities):
+                st.markdown(f"<p style='font-size:20px;'><strong>{category}:</strong> {prob * 100:.2f}%</p>", unsafe_allow_html=True)
+                
+                # Render progress bar with corresponding color
+                progress_bar_html = f"""
+                <div style="background-color: #e6e6e6; border-radius: 10px; width: 100%; height: 20px; margin-bottom: 10px;">
+                    <div style="background-color: {colors[category]}; width: {prob * 100}%; height: 100%; border-radius: 10px;"></div>
+                </div>
+                """
+                st.markdown(progress_bar_html, unsafe_allow_html=True)
 
-                # Display detailed results for a single image with bold and larger text.
-                st.markdown(
-                    f"<h2 style='color: {COLORS[prediction]}'>Predicted Category: <b>{prediction}</b></h2>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f"<p style='font-size:18px'>{CONDITION_DESCRIPTIONS[prediction]}</p>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f"<strong>Confidence Score:</strong> <span style='font-size:18px'>{confidence_score:.2f}%</span>",
-                    unsafe_allow_html=True,
-                )
-
-                # Display category probabilities with progress bars.
-                for category, prob in zip(CATEGORIES, probabilities):
-                    progress_bar_text = f"{category}: {prob * 100:.2f}%"
-                    progress_color = COLORS[category]
-
-                    # Render progress bar and text below it.
-                    st.progress(prob)  # Streamlit's built-in progress bar widget.
-                    st.markdown(f"<p style='color:{progress_color}'>{progress_bar_text}</p>", unsafe_allow_html=True)
-
-            except Exception as e:
-                st.error(f"Error during prediction for {image_name}: {e}")
+            # Grad-CAM visualization
+            cam_image = generate_grad_cam(input_tensor)
+            st.image(cam_image, caption="Grad-CAM Visualization", use_column_width=True)
+        
+        except Exception as e:
+            st.error(f"Error during prediction: {e}")
 else:
-    st.info("Please upload an eye image to proceed.")
+    st.info("Please upload or capture an eye image to proceed.")
