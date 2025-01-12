@@ -187,7 +187,7 @@ if images:
                             unsafe_allow_html=True,
                         )
                     with col2:
-                        if st.button("View", key=f"view_btn_{image_name}"):
+                        if st.button("Open Image", key=f"view_btn_{image_name}"):
                             st.session_state[view_key] = True
                     with col3:
                         if st.button("✕", key=f"close_btn_{image_name}"):
