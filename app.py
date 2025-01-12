@@ -65,20 +65,30 @@ def predict(image_tensor, model):
     probabilities = torch.nn.functional.softmax(outputs, dim=1).squeeze().tolist()
     return probabilities
 
+# Initialize session state for file uploader key
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     st.header("Input Image")
 
     # Clear Data Button
     if st.button("Clear Data"):
-        st.experimental_rerun()  # Reloads the app to clear all inputs
+        st.session_state.uploader_key += 1  # Increment key to reset file uploader
+        st.experimental_rerun()  # Reload app to apply changes
 
     # Input Method Selection
     input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
     images = []
     if input_method == "Upload Image":
-        uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "Upload Eye Image(s)",
+            type=["jpg", "png", "jpeg"],
+            accept_multiple_files=True,
+            key=f"uploader_{st.session_state.uploader_key}"  # Dynamic key for resetting uploader
+        )
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 try:
