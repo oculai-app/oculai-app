@@ -5,7 +5,6 @@ from PIL import Image
 import requests
 import io
 import numpy as np
-import os
 
 # Page Configuration
 st.set_page_config(
@@ -69,27 +68,11 @@ def predict(image_tensor, model):
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     st.header("Input Image")
-    
-    # Add file clearing functionality
-    if st.button("Clear Uploaded Files"):
-        st.session_state.pop("uploaded_files", None)  # Clear session state for uploaded files
-        st.info("Uploaded files cleared.")
-    
     input_method = st.radio("Choose Input Method", ("Upload Image", "Capture from Camera"))
 
     images = []
-    
     if input_method == "Upload Image":
-        if "uploaded_files" not in st.session_state:
-            st.session_state.uploaded_files = []
-        
-        uploaded_files = st.file_uploader(
-            "Upload Eye Image(s)", 
-            type=["jpg", "png", "jpeg"], 
-            accept_multiple_files=True,
-            key="file_uploader"
-        )
-        
+        uploaded_files = st.file_uploader("Upload Eye Image(s)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
         if uploaded_files:
             for uploaded_file in uploaded_files:
                 try:
@@ -97,7 +80,6 @@ with st.sidebar:
                     images.append((uploaded_file.name, img))
                 except Exception as e:
                     st.error(f"Invalid image file: {e}")
-    
     elif input_method == "Capture from Camera":
         camera_image = st.camera_input("Capture Eye Image")
         if camera_image:
