@@ -181,18 +181,31 @@ if images:
                 try:
                     input_tensor = preprocess_image(img)
                     probabilities = predict(input_tensor, model)
-
+    
                     # Get prediction and confidence score for this image
                     prediction_idx = np.argmax(probabilities)
                     prediction = CATEGORIES[prediction_idx]
                     confidence_score = probabilities[prediction_idx] * 100
-
+    
                     # Display results in columns
                     with col1:
                         st.markdown(
                             f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
                             unsafe_allow_html=True,
                         )
+                        
+                        # Additional insights or warnings based on prediction
+                        if prediction != "Normal":
+                            warning_message = f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                            if prediction == "Cataracts":
+                                warning_message += (
+                                    "\n\n**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
+                                    "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
+                                )
+                            st.warning(warning_message)
+                        else:
+                            st.success("The eye appears healthy! No abnormalities detected.")
+    
                     with col2:
                         if st.button("View", key=f"view_btn_{image_name}"):
                             st.session_state.current_view = (image_name, img)
@@ -200,7 +213,7 @@ if images:
                         if st.button("✕", key=f"close_btn_{image_name}"):
                             if st.session_state.current_view and st.session_state.current_view[0] == image_name:
                                 st.session_state.current_view = None
-
+    
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
 
