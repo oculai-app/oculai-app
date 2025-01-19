@@ -159,9 +159,13 @@ if images:
 
                 # Additional insights or warnings based on prediction
                 if prediction != "Normal":
-                    st.warning(
-                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
-                    )
+                    warning_message = f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                    if prediction == "Cataracts":
+                        warning_message += (
+                            "\n\n**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
+                            "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
+                        )
+                    st.warning(warning_message)
                 else:
                     st.success("The eye appears healthy! No abnormalities detected.")
             except Exception as e:
