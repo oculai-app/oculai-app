@@ -131,7 +131,7 @@ if images:
     if len(images) == 1:
         image_name, img = images[0]
         st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
-
+    
         # Analysis and Prediction Section
         with st.spinner(f"Analyzing {image_name}..."):
             try:
@@ -140,12 +140,12 @@ if images:
                 prediction_idx = np.argmax(probabilities)
                 prediction = CATEGORIES[prediction_idx]
                 confidence_score = probabilities[prediction_idx] * 100
-
+    
                 # Display detailed results for a single image
                 st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
                 st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
                 st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
-
+    
                 # Display category probabilities with progress bars
                 st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
                 for category, prob in zip(CATEGORIES, probabilities):
@@ -156,21 +156,23 @@ if images:
                     </div>
                     """
                     st.markdown(progress_html, unsafe_allow_html=True)
-
+    
                 # Additional insights or warnings based on prediction
-                if prediction != "Normal":
-                    warning_message = f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
-                    if prediction == "Cataracts":
-                        warning_message += (
-                            "\n\n**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
-                            "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
-                        )
-                    st.warning(warning_message)
+                if prediction == "Cataracts":
+                    st.warning(
+                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation.\n\n"
+                        "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
+                        "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
+                    )
+                elif prediction != "Normal":
+                    st.warning(
+                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                    )
                 else:
                     st.success("The eye appears healthy! No abnormalities detected.")
             except Exception as e:
                 st.error(f"Error during prediction for {image_name}: {e}")
-
+    
     # Multiple image uploads
     else:
         for image_name, img in images:
@@ -195,14 +197,16 @@ if images:
                         )
                         
                         # Additional insights or warnings based on prediction
-                        if prediction != "Normal":
-                            warning_message = f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
-                            if prediction == "Cataracts":
-                                warning_message += (
-                                    "\n\n**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
-                                    "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
-                                )
-                            st.warning(warning_message)
+                        if prediction == "Cataracts":
+                            st.warning(
+                                f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation.\n\n"
+                                "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
+                                "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
+                            )
+                        elif prediction != "Normal":
+                            st.warning(
+                                f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
+                            )
                         else:
                             st.success("The eye appears healthy! No abnormalities detected.")
     
