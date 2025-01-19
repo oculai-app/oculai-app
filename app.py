@@ -198,7 +198,7 @@ if images:
                         
                         # Display cataract-specific note if detected
                         if prediction == "Cataracts":
-                            st.markdown(
+                            st.warning(
                                 "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
                                 "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma.",
                                 unsafe_allow_html=True,
