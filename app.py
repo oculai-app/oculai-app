@@ -8,7 +8,7 @@ import numpy as np
 
 # Page Configuration
 st.set_page_config(
-    page_title="OculAI",
+    page_title="OculAI - Diabetic Retinopathy",
     page_icon="👁️",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -16,18 +16,20 @@ st.set_page_config(
 
 # Constants
 MODEL_URL = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/0112_found_eyegvd_94.pth"
-CATEGORIES = ["Normal", "Cataracts", "Diabetic Retinopathy", "Glaucoma"]
+CATEGORIES = ["No Diabetic Retinopathy", "Mild", "Moderate", "Severe", "Proliferative"]
 CONDITION_DESCRIPTIONS = {
-    "Normal": "The eye appears healthy with no detected abnormalities.",
-    "Cataracts": "A clouding of the lens in the eye that affects vision.",
-    "Diabetic Retinopathy": "Damage to the retina caused by complications of diabetes.",
-    "Glaucoma": "A group of eye conditions that damage the optic nerve, often due to high pressure."
+    "No Diabetic Retinopathy": "The eye appears healthy with no signs of diabetic retinopathy.",
+    "Mild": "Early signs of diabetic retinopathy with small areas of damage to the retina.",
+    "Moderate": "More extensive damage to the retina, requiring closer monitoring.",
+    "Severe": "Significant damage to the retina that may lead to vision loss without treatment.",
+    "Proliferative": "Advanced stage of diabetic retinopathy with abnormal blood vessel growth, posing a high risk of vision loss."
 }
 COLORS = {
-    "Normal": "#00ff00",
-    "Cataracts": "#ffff00",
-    "Diabetic Retinopathy": "#ff0000",
-    "Glaucoma": "#0082cb"
+    "No Diabetic Retinopathy": "#00ff00",  # Green
+    "Mild": "#ffff00",  # Yellow
+    "Moderate": "#ffa500",  # Orange
+    "Severe": "#ff4500",  # Red-Orange
+    "Proliferative": "#ff0000"  # Red
 }
 
 # Preprocess image with caching
@@ -116,104 +118,46 @@ with st.sidebar:
                 st.error(f"Invalid camera input: {e}")
 
 # Main Content Area for Analysis and Diagnosis
-st.title("👁️ OculAI")
-st.subheader("One Model, Countless Diseases")
-st.markdown("Upload or capture an eye image from the sidebar to analyze potential eye conditions.")
+st.title("👁️ OculAI - Diabetic Retinopathy")
+st.subheader("AI-Powered Detection of Diabetic Retinopathy Stages")
+st.markdown("Upload or capture an eye image from the sidebar to analyze diabetic retinopathy stages.")
 
 # Model Loading Spinner
 with st.spinner("Loading AI Model..."):
     model = load_model()
-
 st.success("Model loaded successfully!")
 
 if images:
-    # Single image upload
-    if len(images) == 1:
-        image_name, img = images[0]
-        st.image(img, caption=f"Selected Image: {image_name}", use_column_width=True)
-    
-        # Analysis and Prediction Section
+    for image_name, img in images:
+        col1, col2, col3 = st.columns([8, 1, 1])
+
         with st.spinner(f"Analyzing {image_name}..."):
             try:
                 input_tensor = preprocess_image(img)
                 probabilities = predict(input_tensor, model)
+
                 prediction_idx = np.argmax(probabilities)
                 prediction = CATEGORIES[prediction_idx]
                 confidence_score = probabilities[prediction_idx] * 100
-    
-                # Display detailed results for a single image
-                st.markdown(f"<h3 style='color: {COLORS[prediction]}'>Predicted Category: {prediction}</h3>", unsafe_allow_html=True)
-                st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
-                st.markdown(f"<strong>Confidence Score:</strong> {confidence_score:.2f}%", unsafe_allow_html=True)
-    
-                # Display category probabilities with progress bars
-                st.markdown("<h3>Category Probabilities:</h3>", unsafe_allow_html=True)
-                for category, prob in zip(CATEGORIES, probabilities):
-                    st.markdown(f"<strong>{category}:</strong> {prob * 100:.2f}%", unsafe_allow_html=True)
-                    progress_html = f"""
-                    <div style="background-color: #e0e0e0; border-radius: 25px; width: 100%; height: 18px; margin-bottom: 10px;">
-                        <div style="background-color: {COLORS[category]}; width: {prob * 100}%; height: 100%; border-radius: 25px;"></div>
-                    </div>
-                    """
-                    st.markdown(progress_html, unsafe_allow_html=True)
-    
-                # Additional insights or warnings based on prediction
-                if prediction == "Cataracts":
-                    st.warning(
-                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation.\n\n"
-                        "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
-                        "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma."
+
+                with col1:
+                    st.markdown(
+                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                        unsafe_allow_html=True,
                     )
-                elif prediction != "Normal":
-                    st.warning(
-                        f"The AI detected signs of {prediction}. Please consult an ophthalmologist for further evaluation."
-                    )
-                else:
-                    st.success("The eye appears healthy! No abnormalities detected.")
+
+                    # Display detailed description for the predicted category
+                    st.markdown(f"<p>{CONDITION_DESCRIPTIONS[prediction]}</p>", unsafe_allow_html=True)
+
+                with col2:
+                    if st.button("View", key=f"view_btn_{image_name}"):
+                        st.session_state.current_view = (image_name, img)
+                with col3:
+                    if st.button("✕", key=f"close_btn_{image_name}"):
+                        if st.session_state.current_view and st.session_state.current_view[0] == image_name:
+                            st.session_state.current_view = None
+
             except Exception as e:
                 st.error(f"Error during prediction for {image_name}: {e}")
-    
-    # Multiple image uploads
-    else:
-        for image_name, img in images:
-            col1, col2, col3 = st.columns([8, 1, 1])
-            
-            # Show spinner while analyzing each image sequentially
-            with st.spinner(f"Analyzing {image_name}..."):
-                try:
-                    input_tensor = preprocess_image(img)
-                    probabilities = predict(input_tensor, model)
-        
-                    # Get prediction and confidence score for this image
-                    prediction_idx = np.argmax(probabilities)
-                    prediction = CATEGORIES[prediction_idx]
-                    confidence_score = probabilities[prediction_idx] * 100
-        
-                    # Display results in columns
-                    with col1:
-                        st.markdown(
-                            f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
-                            unsafe_allow_html=True,
-                        )
-                        
-                        # Display cataract-specific note if detected
-                        if prediction == "Cataracts":
-                            st.markdown(
-                                "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
-                                "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma.",
-                                unsafe_allow_html=True,
-                            )
-        
-                    with col2:
-                        if st.button("View", key=f"view_btn_{image_name}"):
-                            st.session_state.current_view = (image_name, img)
-                    with col3:
-                        if st.button("✕", key=f"close_btn_{image_name}"):
-                            if st.session_state.current_view and st.session_state.current_view[0] == image_name:
-                                st.session_state.current_view = None
-        
-                except Exception as e:
-                    st.error(f"Error during prediction for {image_name}: {e}")
-
 else:
     st.info("Please upload or capture an eye image from the sidebar to proceed.")
