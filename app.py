@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Constants
-MODEL_URL = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/0112_found_eyegvd_94.pth"
+MODEL_URL = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/20250121_DR_DRgaussian_effnetb0_e30.pth"
 CATEGORIES = ["No Diabetic Retinopathy", "Mild", "Moderate", "Severe", "Proliferative"]
 CONDITION_DESCRIPTIONS = {
     "No Diabetic Retinopathy": "The eye appears healthy with no signs of diabetic retinopathy.",
