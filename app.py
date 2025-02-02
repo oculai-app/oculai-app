@@ -75,6 +75,10 @@ if 'current_view' not in st.session_state:
 
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
+    st.markdown(
+        f"Created by **Ramya Elangovan** and **Rhea Morani**",
+        unsafe_allow_html=True,
+    )
     st.header("Input Image")
 
     # Display current viewed image at the top of the sidebar
