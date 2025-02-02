@@ -78,6 +78,8 @@ with st.sidebar:
     with st.expander("FOUNDERS"):
         st.markdown("**Founder:** Ramya Elangovan")  
         st.markdown("**Co-Founder:** Rhea Morani")
+    
+    st.header("Input Image")
 
     # Display current viewed image at the top of the sidebar
     if st.session_state.current_view:
