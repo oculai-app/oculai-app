@@ -75,7 +75,7 @@ if 'current_view' not in st.session_state:
 
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
-    with st.expander("FOUNDERS"):
+    with st.expander("CREATED BY"):
         st.markdown("**Founder:** Ramya Elangovan")  
         st.markdown("**Co-Founder:** Rhea Morani")
     
