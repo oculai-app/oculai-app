@@ -69,10 +69,6 @@ def predict(image_tensor, model):
 if "uploader_key" not in st.session_state:
     st.session_state.uploader_key = 0
 
-# Initialize session state for current view
-if 'current_view' not in st.session_state:
-    st.session_state.current_view = None
-
 # Sidebar for Input Method Selection and Image Upload/Capture
 with st.sidebar:
     with st.expander("CREATED BY"):
@@ -81,15 +77,9 @@ with st.sidebar:
     
     st.header("Input Image")
 
-    # Display current viewed image at the top of the sidebar
-    if st.session_state.current_view:
-        st.image(st.session_state.current_view[1], caption=st.session_state.current_view[0], use_column_width=True)
-        st.markdown("---")
-
     # Clear Data Button
     if st.button("Clear Data"):
         st.session_state.uploader_key += 1  # Increment key to reset file uploader
-        st.session_state.current_view = None
         st.experimental_rerun()  # Reload app to apply changes
 
     # Input Method Selection
@@ -180,7 +170,6 @@ if images:
     # Multiple image uploads
     else:
         for image_name, img in images:
-            col1, col2, col3 = st.columns([8, 1, 1])
             
             # Show spinner while analyzing each image sequentially
             with st.spinner(f"Analyzing {image_name}..."):
@@ -193,28 +182,10 @@ if images:
                     prediction = CATEGORIES[prediction_idx]
                     confidence_score = probabilities[prediction_idx] * 100
         
-                    # Display results in columns
-                    with col1:
-                        st.markdown(
-                            f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
-                            unsafe_allow_html=True,
-                        )
-                        
-                        # Display cataract-specific note if detected
-                        if prediction == "Cataracts":
-                            st.markdown(
-                                "**Note:** Other ocular disease markers can be masked by the opacities in the lens. "
-                                "This may negatively affect the accuracy in diagnosing diabetic retinopathy or glaucoma.",
-                                unsafe_allow_html=True,
-                            )
-        
-                    with col2:
-                        if st.button("View", key=f"view_btn_{image_name}"):
-                            st.session_state.current_view = (image_name, img)
-                    with col3:
-                        if st.button("✕", key=f"close_btn_{image_name}"):
-                            if st.session_state.current_view and st.session_state.current_view[0] == image_name:
-                                st.session_state.current_view = None
+                    st.markdown(
+                        f"**{image_name}**: <span style='color:{COLORS[prediction]}'>{prediction}</span> ({confidence_score:.2f}%)",
+                        unsafe_allow_html=True,
+                    )
         
                 except Exception as e:
                     st.error(f"Error during prediction for {image_name}: {e}")
