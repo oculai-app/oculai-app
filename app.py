@@ -15,7 +15,6 @@ st.set_page_config(
 )
 
 # Constants
-MODEL_URL = "https://huggingface.co/OncoAI/oncobank/resolve/main/0112_found_eyegvd_94.pth"
 CATEGORIES = ["Normal", "Cataracts", "Diabetic Retinopathy", "Glaucoma"]
 CONDITION_DESCRIPTIONS = {
     "Normal": "The eye appears healthy with no detected abnormalities.",
@@ -41,21 +40,19 @@ def preprocess_image(image):
     ])
     return transform(image).unsqueeze(0)
 
-# Load model with caching
+# Load model from local file with caching
 @st.cache_resource(show_spinner=False)
 def load_model():
     try:
-        response = requests.get(MODEL_URL)
-        response.raise_for_status()
         model = models.efficientnet_b0(pretrained=True)
         num_features = model.classifier[1].in_features
         model.classifier[1] = torch.nn.Linear(num_features, len(CATEGORIES))
-        state_dict = torch.load(io.BytesIO(response.content), map_location=torch.device("cpu"))
+        state_dict = torch.load("0112_found_eyegvd_94.pth", map_location=torch.device("cpu"))
         model.load_state_dict(state_dict, strict=True)
         model.eval()
         return model
     except Exception as e:
-        st.error(f"Error loading the model: {e}")
+        st.error(f"Error loading the model from local file: {e}")
         raise e
 
 # Prediction function
