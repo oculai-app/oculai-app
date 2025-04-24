@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 # Constants
-MODEL_URL = "https://huggingface.co/oculotest/smart-scanner-model/resolve/main/0112_found_eyegvd_94.pth"
+MODEL_URL = "https://huggingface.co/OncoAI/oncobank/resolve/main/0112_found_eyegvd_94.pth"
 CATEGORIES = ["Normal", "Cataracts", "Diabetic Retinopathy", "Glaucoma"]
 CONDITION_DESCRIPTIONS = {
     "Normal": "The eye appears healthy with no detected abnormalities.",
